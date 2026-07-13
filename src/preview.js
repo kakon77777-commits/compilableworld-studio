@@ -7,17 +7,20 @@ import { parseFrontmatter, validateClass } from './frontmatter.js'
 import { S }                  from './state.js'
 import { monitor }            from './monitor.js'
 import { renderWorldIrProjection } from './viewregistry.js'
+import { wireEntityFormInteractions } from './entityview.js'
 
 export function previewUpdate() {
   const el  = document.getElementById('preview-body')
   const src = editorGet()
   wireAimdInteractions(el)
+  wireEntityFormInteractions(el)
   if (!src) { el.innerHTML = ''; return }
 
   // World IR documents (kind: state_machine / entity / entity_list / ...,
-  // see viewregistry.js) get a specialized read-only projection instead of
-  // the Markdown pipeline -- the file itself is still plain YAML text in
-  // the editor pane, this only changes how it's displayed.
+  // see viewregistry.js) get a specialized projection instead of the
+  // Markdown pipeline -- the file itself is still plain YAML text in the
+  // editor pane. Most are read-only comprehension aids; the Entity Form
+  // View is editable (see entityview.js's "Bidirectional editing" note).
   const worldIrHtml = renderWorldIrProjection(src)
   if (worldIrHtml !== null) {
     el.innerHTML = worldIrHtml

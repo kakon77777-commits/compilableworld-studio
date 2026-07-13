@@ -18,6 +18,8 @@
 //       guards: ["trust >= 0.45", "positive_interactions >= 5"]
 
 import jsYaml from 'js-yaml'
+import { validateStateMachine, unreachableStatesOf } from './validate.js'
+import { renderDiagnosticsBlock } from './diagnostics.js'
 
 const esc = (s) => String(s).replace(/[&<>"']/g, c =>
   ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
@@ -40,7 +42,7 @@ function parseStateMachine(src) {
     if (t.to)   seen.add(t.to)
   }
   if (doc.initial) seen.add(doc.initial)
-  return { id: doc.id || '(unnamed)', initial: doc.initial || null, states: [...seen], transitions }
+  return { doc, id: doc.id || '(unnamed)', initial: doc.initial || null, states: [...seen], transitions }
 }
 
 // Simple layered layout: states in one row (v0.1 -- no attempt at a general
@@ -55,6 +57,9 @@ export function renderStateMachine(src) {
   } catch (e) {
     return `<div class="sm-error">⚠ Not a valid state_machine document: ${esc(e.message)}</div>`
   }
+
+  const issues = validateStateMachine(sm.doc)
+  const unreachable = unreachableStatesOf(issues)
 
   const boxW = 150, boxH = 56, gapX = 90, gapY = 100
   const cols = Math.max(1, sm.states.length)
@@ -94,10 +99,12 @@ export function renderStateMachine(src) {
   const nodesSvg = sm.states.map(s => {
     const p = pos.get(s)
     const isInitial = s === sm.initial
+    const isUnreachable = unreachable.has(s)
+    const cls = ['sm-node', isInitial && 'sm-node-initial', isUnreachable && 'sm-node-unreachable'].filter(Boolean).join(' ')
     return `
-      <g class="sm-node${isInitial ? ' sm-node-initial' : ''}">
+      <g class="${cls}">
         <rect x="${p.x}" y="${p.y}" width="${boxW}" height="${boxH}" rx="8"/>
-        <text x="${p.x + boxW/2}" y="${p.y + boxH/2 + 5}" text-anchor="middle">${esc(s)}</text>
+        <text x="${p.x + boxW/2}" y="${p.y + boxH/2 + 5}" text-anchor="middle">${esc(s)}${isUnreachable ? ' ⚠' : ''}</text>
       </g>
     `
   }).join('\n')
@@ -120,6 +127,7 @@ export function renderStateMachine(src) {
         <g transform="translate(0,${boxH})">${edgesSvg}</g>
         ${nodesSvg}
       </svg>
+      ${renderDiagnosticsBlock(issues)}
       <details class="sm-raw">
         <summary>Raw transitions</summary>
         <table class="sm-table">

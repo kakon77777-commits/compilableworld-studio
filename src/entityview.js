@@ -1,11 +1,9 @@
 // ─── ENTITY VIEW ──────────────────────────────────────────────────
 // Renders EntityIR documents (whitepaper compilableworld_studio_mssp_rdr_
-// visual_world_ide_v0.1.md §3.1/§3.2, §6.2) as read-only projections of the
-// YAML text -- same pattern as smview.js: the file itself stays the
-// authoritative source, edited via the CodeMirror pane; this is a
-// comprehension aid, not a separate save format or a form with its own
-// input widgets writing back into the YAML (that bidirectional-sync is
-// real future work, not yet built -- see this repo's README "Not done yet").
+// visual_world_ide_v0.1.md §3.1/§3.2, §6.2) as projections of the YAML text.
+// The Form View (single entity) is editable -- see "Bidirectional editing"
+// below. The Table View (entity_list) stays read-only for now (editing a
+// multi-row table safely is a bigger, separate piece of work).
 //
 // Two recognized shapes (v0.1):
 //
@@ -26,8 +24,30 @@
 //       type: item
 //       name: 破舊地圖
 //       location: room.inn.cellar
+//
+// ── Bidirectional editing (Form View only) ──────────────────────────
+// Scalar and simple string-array fields render as real <input> elements;
+// nested objects stay a read-only <pre> (editing those is out of scope for
+// v0.1 -- edit the raw YAML for that). `id` and `kind` are deliberately
+// NOT editable here, matching the whitepaper's own ch.13.1 principle
+// ("display names can change, IDs should not be casually changed") --
+// nothing references these IDs cross-file yet, but the habit is worth
+// keeping from the start.
+//
+// On a field's `change` event (fires on blur/Enter, not per-keystroke --
+// deliberately not "live as you type", to avoid re-rendering the form out
+// from under an in-progress edit), the whole doc is reconstructed from the
+// current form values and re-serialized with `jsYaml.dump()`, then written
+// into the CodeMirror pane via `editorSet()`. That save-and-reload round
+// trip is honest about its real cost: `jsYaml.dump()` does NOT preserve
+// comments or the original YAML formatting/key order across a structural
+// edit. For a hand-authored file with comments you care about, edit the
+// raw YAML directly instead of the form.
 
 import jsYaml from 'js-yaml'
+import { validateEntity, validateEntityList } from './validate.js'
+import { renderDiagnosticsBlock } from './diagnostics.js'
+import { editorGet, editorSet } from './editor.js'
 
 const esc = (s) => String(s).replace(/[&<>"']/g, c =>
   ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
@@ -52,6 +72,21 @@ function formatValue(v) {
   return esc(String(v))
 }
 
+// An editable field is one whose value is a string/number/boolean, or an
+// array of such (rendered as a comma-separated input) -- a nested
+// object/array-of-objects has no simple single-input representation, so it
+// stays the read-only <pre> from formatValue().
+function isEditableValue(v) {
+  if (v === null || v === undefined) return true
+  if (Array.isArray(v)) return v.every(x => x === null || typeof x !== 'object')
+  return typeof v !== 'object'
+}
+
+function fieldToInputValue(v) {
+  if (Array.isArray(v)) return v.join(', ')
+  return v === null || v === undefined ? '' : String(v)
+}
+
 export function renderEntityForm(src) {
   let doc
   try {
@@ -62,6 +97,7 @@ export function renderEntityForm(src) {
   if (!doc || typeof doc !== 'object') return `<div class="sm-error">⚠ Not a valid entity document: empty or not a mapping</div>`
 
   const rest = Object.keys(doc).filter(k => !FORM_HEADER_FIELDS.includes(k))
+  const issues = validateEntity(doc)
 
   return `
     <div class="ev-form">
@@ -71,11 +107,52 @@ export function renderEntityForm(src) {
       </div>
       <table class="ev-field-table">
         <tbody>
-          ${rest.map(k => `<tr><th>${esc(k)}</th><td>${formatValue(doc[k])}</td></tr>`).join('\n')}
+          ${rest.map(k => {
+            const v = doc[k]
+            if (!isEditableValue(v)) return `<tr><th>${esc(k)}</th><td>${formatValue(v)}</td></tr>`
+            const isArray = Array.isArray(v)
+            return `<tr><th>${esc(k)}</th><td>
+              <input type="text" class="ev-input" data-field="${esc(k)}" data-array="${isArray}"
+                     value="${esc(fieldToInputValue(v))}"${isArray ? ' placeholder="comma, separated, values"' : ''}>
+            </td></tr>`
+          }).join('\n')}
         </tbody>
       </table>
+      ${renderDiagnosticsBlock(issues)}
     </div>
   `
+}
+
+// Delegated on the stable #preview-body element so it survives
+// previewUpdate() replacing #preview-body's innerHTML on every render --
+// same pattern preview.js already uses for wireAimdInteractions. Wire once
+// per app lifetime, guarded by evFormWired, not once per render.
+let evFormWired = false
+export function wireEntityFormInteractions(el) {
+  if (evFormWired || !el) return
+  evFormWired = true
+
+  el.addEventListener('change', (e) => {
+    const input = e.target.closest('.ev-input')
+    if (!input) return
+
+    let doc
+    try {
+      doc = jsYaml.load(editorGet())
+    } catch {
+      return   // editor content isn't valid YAML right now -- nothing safe to write back
+    }
+    if (!doc || typeof doc !== 'object') return
+
+    const field = input.dataset.field
+    const isArray = input.dataset.array === 'true'
+    const raw = input.value
+    doc[field] = isArray
+      ? raw.split(',').map(s => s.trim()).filter(Boolean)
+      : raw
+
+    editorSet(jsYaml.dump(doc))
+  })
 }
 
 export function renderEntityTable(src) {
@@ -98,6 +175,8 @@ export function renderEntityTable(src) {
   for (const key of priority) if (entities.some(e => key in (e || {}))) { cols.push(key); seen.add(key) }
   for (const e of entities) for (const k of Object.keys(e || {})) if (!seen.has(k)) { cols.push(k); seen.add(k) }
 
+  const issues = validateEntityList(doc)
+
   return `
     <div class="ev-table-view">
       <div class="ev-form-header">
@@ -110,6 +189,7 @@ export function renderEntityTable(src) {
           ${entities.map(e => `<tr>${cols.map(c => `<td>${c in (e || {}) ? formatValue(e[c]) : ''}</td>`).join('')}</tr>`).join('\n')}
         </tbody>
       </table>
+      ${renderDiagnosticsBlock(issues)}
     </div>
   `
 }
