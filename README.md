@@ -1,6 +1,12 @@
-# CompilableWorld Studio
+# CompilableWorld Studio (archived — merged into eveglyph-editor)
 
-> Local-first, AI-native visual editor for CompilableWorld's World IR — entities, states, functions, triggers, state machines. Forked from [eveglyph-editor](https://github.com/kakon77777-commits/eveglyph-editor)'s shared workspace core (local files, git, agent bridge, diff review). Part of **EveMissLab**.
+> **This repo is archived.** Everything here turned out to be purely additive to the fork it came from — no code was removed or restructured, only new files and a handful of small edits — so it's been folded back into **[eveglyph-editor](https://github.com/kakon77777-commits/eveglyph-editor)** as a "World IR mode" that lives alongside Markdown editing, rather than maintained as a second copy of the same shared workspace core (file storage, git integration, agent bridge, diff review). See eveglyph-editor's `CHANGELOG.md` ("World IR mode (CompilableWorld)") and `USER-GUIDE.md` for the current, maintained version of everything described below.
+
+Everything past this point is kept for historical reference only — the design docs and the original build history that led to this conclusion.
+
+---
+
+Local-first, AI-native visual editor for CompilableWorld's World IR — entities, states, functions, triggers, state machines. Forked from [eveglyph-editor](https://github.com/kakon77777-commits/eveglyph-editor)'s shared workspace core (local files, git, agent bridge, diff review). Part of **EveMissLab**.
 
 Full design: [`docs/compilableworld-studio-v0.1.md`](docs/compilableworld-studio-v0.1.md).
 
