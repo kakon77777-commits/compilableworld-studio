@@ -1,10 +1,12 @@
 // ─── STATE MACHINE VIEW ───────────────────────────────────────────
 // Renders a TransitionIR/state-machine YAML document (whitepaper
 // compilableworld_studio_mssp_rdr_visual_world_ide_v0.1.md §3.3/§6.7) as an
-// SVG diagram: states as boxes, transitions as labeled arrows. This is a
-// read-only visualization of the file's own text (the source-of-truth stays
-// the YAML in the editor pane) -- there is no separate binary/save format,
-// matching Neo's "purely a GUI editor, no runtime pipeline yet" scope cut.
+// SVG diagram: states as boxes, transitions as labeled arrows. The YAML in
+// the editor pane is still the authoritative source -- there is no separate
+// save format -- but this view is no longer read-only (Neo: "可以直接點下去
+// 可以用的" -- click-to-use, not just look-at): you can add/delete states
+// and transitions by clicking, and the YAML is reconstructed and written
+// back the same way entityview.js's Form View does it.
 //
 // Recognized shape (a single state machine per file, v0.1):
 //   kind: state_machine
@@ -20,6 +22,7 @@
 import jsYaml from 'js-yaml'
 import { validateStateMachine, unreachableStatesOf } from './validate.js'
 import { renderDiagnosticsBlock } from './diagnostics.js'
+import { editorGet, editorSet } from './editor.js'
 
 const esc = (s) => String(s).replace(/[&<>"']/g, c =>
   ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
@@ -105,11 +108,13 @@ export function renderStateMachine(src) {
       <g class="${cls}">
         <rect x="${p.x}" y="${p.y}" width="${boxW}" height="${boxH}" rx="8"/>
         <text x="${p.x + boxW/2}" y="${p.y + boxH/2 + 5}" text-anchor="middle">${esc(s)}${isUnreachable ? ' ⚠' : ''}</text>
+        <text class="sm-node-delete" data-state="${esc(s)}" x="${p.x + boxW - 8}" y="${p.y + 15}" text-anchor="middle" title="Delete state">✕</text>
       </g>
     `
   }).join('\n')
 
   const height = Math.max(boxH + 60, maxArc + 20)
+  const stateOptions = sm.states.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('')
 
   return `
     <div class="sm-view">
@@ -128,20 +133,111 @@ export function renderStateMachine(src) {
         ${nodesSvg}
       </svg>
       ${renderDiagnosticsBlock(issues)}
+
+      <div class="sm-editor-controls">
+        <div class="sm-add-row">
+          <input type="text" class="sm-new-state-input" placeholder="new state name">
+          <button class="btn-s sm-add-state-btn">+ Add State</button>
+        </div>
+        <div class="sm-add-row sm-add-transition">
+          <select class="sm-tx-from">${stateOptions}</select>
+          <span class="sm-arrow-glyph">→</span>
+          <select class="sm-tx-to">${stateOptions}</select>
+          <input type="text" class="sm-tx-on" placeholder="on: event_name">
+          <input type="text" class="sm-tx-guards" placeholder="guards (separate with |)">
+          <button class="btn-s sm-add-tx-btn">+ Add Transition</button>
+        </div>
+      </div>
+
       <details class="sm-raw">
         <summary>Raw transitions</summary>
         <table class="sm-table">
-          <thead><tr><th>from</th><th>to</th><th>on</th><th>guards</th></tr></thead>
+          <thead><tr><th>from</th><th>to</th><th>on</th><th>guards</th><th></th></tr></thead>
           <tbody>
-            ${sm.transitions.map(t => `<tr>
+            ${sm.transitions.map((t, i) => `<tr>
               <td>${esc(t.from ?? '')}</td>
               <td>${esc(t.to ?? '')}</td>
               <td>${esc(t.on ?? '')}</td>
               <td>${Array.isArray(t.guards) ? t.guards.map(g => `<code>${esc(g)}</code>`).join('<br>') : ''}</td>
+              <td><button class="sm-tx-delete" data-index="${i}" title="Delete transition">✕</button></td>
             </tr>`).join('\n')}
           </tbody>
         </table>
       </details>
     </div>
   `
+}
+
+// Re-reads the editor fresh each time (not the closure's `sm.doc` from
+// whatever render call happened to wire this listener) so a rapid sequence
+// of clicks always mutates the current on-disk-pending state, not a stale
+// snapshot -- same defensive pattern as entityview.js's wireEntityFormInteractions.
+function withCurrentDoc(mutate) {
+  let doc
+  try {
+    doc = jsYaml.load(editorGet())
+  } catch {
+    return   // editor content isn't valid YAML right now -- nothing safe to write back
+  }
+  if (!doc || typeof doc !== 'object') return
+  mutate(doc)
+  editorSet(jsYaml.dump(doc))
+}
+
+let smWired = false
+export function wireStateMachineInteractions(el) {
+  if (smWired || !el) return
+  smWired = true
+
+  el.addEventListener('click', (e) => {
+    const addStateBtn = e.target.closest('.sm-add-state-btn')
+    if (addStateBtn) {
+      const input = el.querySelector('.sm-new-state-input')
+      const name = input?.value.trim()
+      if (!name) return
+      withCurrentDoc(doc => {
+        if (!Array.isArray(doc.states)) doc.states = []
+        if (!doc.states.includes(name)) doc.states.push(name)
+      })
+      return
+    }
+
+    const delStateBtn = e.target.closest('.sm-node-delete')
+    if (delStateBtn) {
+      const state = delStateBtn.dataset.state
+      withCurrentDoc(doc => {
+        if (Array.isArray(doc.states)) {
+          doc.states = doc.states.filter(s => s !== state)
+          if (!doc.states.length) delete doc.states   // don't leave a dangling `states: []` once the last explicit entry is gone -- states are inferred from transitions anyway
+        }
+        if (Array.isArray(doc.transitions)) doc.transitions = doc.transitions.filter(t => t.from !== state && t.to !== state)
+      })
+      return
+    }
+
+    const addTxBtn = e.target.closest('.sm-add-tx-btn')
+    if (addTxBtn) {
+      const from = el.querySelector('.sm-tx-from')?.value
+      const to = el.querySelector('.sm-tx-to')?.value
+      const on = el.querySelector('.sm-tx-on')?.value.trim()
+      const guardsRaw = el.querySelector('.sm-tx-guards')?.value.trim()
+      if (!from || !to || !on) return
+      const guards = guardsRaw ? guardsRaw.split('|').map(g => g.trim()).filter(Boolean) : undefined
+      withCurrentDoc(doc => {
+        if (!Array.isArray(doc.transitions)) doc.transitions = []
+        const transition = { from, to, on }
+        if (guards?.length) transition.guards = guards
+        doc.transitions.push(transition)
+      })
+      return
+    }
+
+    const delTxBtn = e.target.closest('.sm-tx-delete')
+    if (delTxBtn) {
+      const index = Number(delTxBtn.dataset.index)
+      withCurrentDoc(doc => {
+        if (Array.isArray(doc.transitions)) doc.transitions.splice(index, 1)
+      })
+    }
+  })
 }

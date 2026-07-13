@@ -8,7 +8,7 @@ Full design: [`docs/compilableworld-studio-v0.1.md`](docs/compilableworld-studio
 
 Per Neo's explicit scope cut: this is the editing/viewing/validating surface, not the full Studio vision — no Simulator, Compiler, or Runtime pipeline yet (see the whitepaper's ch.14/ch.18 staged plan). What exists right now:
 
-- **State Machine View** (`src/smview.js`) — a `.yaml`/`.yml` file starting with `kind: state_machine` renders as an SVG diagram (states as boxes, transitions as labeled arrows, guard conditions inline).
+- **State Machine View** (`src/smview.js`) — a `.yaml`/`.yml` file starting with `kind: state_machine` renders as an SVG diagram (states as boxes, transitions as labeled arrows, guard conditions inline), and it's **click-to-use, not just look-at**: "+ Add State" and "+ Add Transition" controls (the latter with from/to dropdowns populated from the current states) below the diagram, a "✕" on every state node, a "✕" on every row of the raw transitions table. Every action rewrites the YAML in the editor pane the same way the Form View does.
 - **Entity Form View** (`src/entityview.js`) — `kind: entity` renders as a field/value form, **editable**: changing a field and blurring (or Enter) rewrites the YAML in the editor pane. `id`/`kind` stay read-only (whitepaper ch.13.1: stable IDs shouldn't change casually). Nested objects and the Table View stay read-only.
 - **Entity Table View** (`src/entityview.js`) — `kind: entity_list` renders as a read-only table, columns unioned across all entities.
 - **Validator** (`src/validate.js`) — pure functions, no DOM: `validateStateMachine` (no/undefined initial state, undefined transition endpoints, conflicting transitions, unreachable states via forward BFS), `validateEntity`/`validateEntityList` (missing/duplicate ids). Every issue carries a stable `code` plus a zh-Hant `message` — meant to be read by an agent as much as rendered for a human (`src/diagnostics.js` does the HTML rendering; the data itself is plain JSON). Shown inline in every view (a Diagnostics block, plus unreachable states get a dashed amber border directly on the diagram).
@@ -42,7 +42,7 @@ This is a fork, not a shared codebase — `eveglyph-editor` stays the Markdown-d
 
 ## Not done yet
 
-- Bidirectional editing exists only for the single-Entity Form View; the Table View and State Machine View stay read-only projections.
+- Bidirectional editing covers the Entity Form View (field edits) and the State Machine View (add/delete state, add/delete transition); the Entity Table View stays a read-only projection.
 - `jsYaml.dump()` round-tripping (Form View saves) does not preserve comments or original key order/formatting — a real, known cost of the simple approach, not hidden.
 - No Graph/dependency view, no DSL view (whitepaper ch.3) — Workspace Overview is an inventory, not a dependency graph (no IR type declares cross-references yet).
 - `editor.js`'s language-mode choice (YAML vs Markdown) is still a direct extension check, not part of the view registry.

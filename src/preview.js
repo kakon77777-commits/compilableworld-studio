@@ -8,12 +8,14 @@ import { S }                  from './state.js'
 import { monitor }            from './monitor.js'
 import { renderWorldIrProjection } from './viewregistry.js'
 import { wireEntityFormInteractions } from './entityview.js'
+import { wireStateMachineInteractions } from './smview.js'
 
 export function previewUpdate() {
   const el  = document.getElementById('preview-body')
   const src = editorGet()
   wireAimdInteractions(el)
   wireEntityFormInteractions(el)
+  wireStateMachineInteractions(el)
   if (!src) { el.innerHTML = ''; return }
 
   // World IR documents (kind: state_machine / entity / entity_list / ...,
