@@ -6,7 +6,7 @@ import { editorGet }          from './editor.js'
 import { parseFrontmatter, validateClass } from './frontmatter.js'
 import { S }                  from './state.js'
 import { monitor }            from './monitor.js'
-import { isStateMachineDoc, renderStateMachine } from './smview.js'
+import { renderWorldIrProjection } from './viewregistry.js'
 
 export function previewUpdate() {
   const el  = document.getElementById('preview-body')
@@ -14,11 +14,13 @@ export function previewUpdate() {
   wireAimdInteractions(el)
   if (!src) { el.innerHTML = ''; return }
 
-  // World IR state-machine documents (kind: state_machine) get the diagram
-  // view instead of the Markdown pipeline -- the file itself is still plain
-  // YAML text in the editor pane, this is just a different projection of it.
-  if (isStateMachineDoc(src)) {
-    el.innerHTML = renderStateMachine(src)
+  // World IR documents (kind: state_machine / entity / entity_list / ...,
+  // see viewregistry.js) get a specialized read-only projection instead of
+  // the Markdown pipeline -- the file itself is still plain YAML text in
+  // the editor pane, this only changes how it's displayed.
+  const worldIrHtml = renderWorldIrProjection(src)
+  if (worldIrHtml !== null) {
+    el.innerHTML = worldIrHtml
     return
   }
 

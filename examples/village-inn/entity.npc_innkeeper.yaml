@@ -1,0 +1,10 @@
+# EntityIR single-entity document -- renders as a Form View.
+# Taken from this project's own whitepaper (docs/compilableworld-studio-v0.1.md §3.1).
+kind: entity
+id: npc.innkeeper
+type: character
+name: 馬洛
+location: room.inn.main
+traits:
+  - cautious
+  - pragmatic
