@@ -1,0 +1,42 @@
+{
+  "name": "compilableworld-studio",
+  "version": "0.1.0",
+  "description": "Local-first, AI-native visual editor for CompilableWorld's World IR (entities, states, functions, triggers, state machines) — forked from eveglyph-editor's shared workspace core (local files, git, agent bridge, diff review). GUI-editor-only for now: no validator/simulator/compiler/runtime pipeline yet.",
+  "author": "Neo.K (許筌崴) · EveMissLab (一言諾科技有限公司) <kakon77777@evemisslab.com>",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.18.1",
+    "@codemirror/commands": "^6.6.0",
+    "@codemirror/lang-markdown": "^6.2.5",
+    "@codemirror/lang-yaml": "^6.1.1",
+    "@codemirror/language": "^6.10.1",
+    "@codemirror/lint": "^6.8.1",
+    "@codemirror/search": "^6.5.6",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/view": "^6.34.1",
+    "@lezer/highlight": "^1.2.1",
+    "codemirror": "^6.0.1",
+    "dompurify": "^3.4.10",
+    "iconv-lite": "^0.7.2",
+    "js-yaml": "^4.1.0",
+    "jschardet": "^3.1.4",
+    "katex": "^0.16.9",
+    "mammoth": "^1.12.0",
+    "marked": "^9.1.6",
+    "turndown": "^7.2.4"
+  },
+  "devDependencies": {
+    "vite": "^6.0.7"
+  }
+}
